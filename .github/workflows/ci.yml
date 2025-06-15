@@ -64,8 +64,8 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable nodeapp.service
             sudo systemctl restart nodeapp.service
-            EOF
-            
+          EOF
+
       - name: Test deployment
         run: |
             echo "😎" 
