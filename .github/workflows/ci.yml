@@ -20,6 +20,29 @@ jobs:
       - name: Install dependencies
         run: npm install --production
 
+      - name: Checkout and Terraform Init
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init & Apply
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION:            ${{ secrets.AWS_REGION }}
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Get EC2 IP
+        id: ec2
+        run: |
+          cd terraform
+          echo "ip=$(terraform output -raw instance_public_ip)" >> $GITHUB_OUTPUT
+
+
       - name: Package app
         run: tar czf app.tar.gz index.js node_modules package.json Dockerfile
 
@@ -37,7 +60,7 @@ jobs:
       - name: Deploy on EC2 & restart service
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
+            ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }} << 'EOF'
             # prepare deploy dir
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
 
