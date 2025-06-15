@@ -2,7 +2,7 @@ name: CD – Deploy to EC2
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   deploy:
@@ -20,49 +20,45 @@ jobs:
       - name: Install dependencies
         run: npm install --production
 
-      - name: Archive app for transfer
+      - name: Package app
         run: tar czf app.tar.gz index.js node_modules package.json
 
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.TARGET_SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+
       - name: Copy archive to EC2
-        env:
-          SSH_KEY: ${{ secrets.TARGET_SSH_KEY }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          HOST:    ${{ secrets.HOST }}
         run: |
-          scp -i <(echo "$SSH_KEY") -o StrictHostKeyChecking=no app.tar.gz \
-            $SSH_USER@$HOST:/home/ubuntu/
+          scp -i key.pem -o StrictHostKeyChecking=no \
+            app.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.HOST }}:/home/ubuntu/
 
-      - name: Deploy on EC2 and restart service
-        env:
-          SSH_KEY: ${{ secrets.TARGET_SSH_KEY }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          HOST:    ${{ secrets.HOST }}
+      - name: Deploy on EC2 & restart service
         run: |
-          ssh -i <(echo "$SSH_KEY") -o StrictHostKeyChecking=no \
-            $SSH_USER@$HOST << 'EOF'
-  # 1) unpack into your app directory
-  mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
-  tar xzf app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
+          ssh -i key.pem -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
 
-  # 2) overwrite (or create) the systemd service
-  cat << 'SERVICE' | sudo tee /etc/systemd/system/nodeapp.service
-[Unit]
-Description=Node.js Sample App
-After=network.target
 
-[Service]
-WorkingDirectory=/home/ubuntu/devOpsNodeJS_Deploy
-ExecStart=/usr/bin/node index.js
-Restart=on-failure
-User=ubuntu
-Environment=NODE_ENV=production
+            mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
+            tar xzf /home/ubuntu/app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
 
-[Install]
-WantedBy=multi-user.target
-SERVICE
+            cat << 'SERVICE' | sudo tee /etc/systemd/system/nodeapp.service
+            [Unit]
+            Description=Node.js Sample App
+            After=network.target
 
-  # 3) reload & restart
-  sudo systemctl daemon-reload
-  sudo systemctl enable nodeapp.service
-  sudo systemctl restart nodeapp.service
-EOF
+            [Service]
+            WorkingDirectory=/home/ubuntu/devOpsNodeJS_Deploy
+            ExecStart=/usr/bin/node index.js
+            Restart=on-failure
+            User=ubuntu
+            Environment=NODE_ENV=production
+
+            [Install]
+            WantedBy=multi-user.target
+            SERVICE
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable nodeapp.service
+            sudo systemctl restart nodeapp.service
+            EOF
