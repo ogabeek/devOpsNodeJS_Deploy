@@ -1,0 +1,13 @@
+[Unit]
+Description=Node.js Sample App
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/devOpsNodeJS_Deploy
+ExecStart=/usr/bin/node /home/ubuntu/devOpsNodeJS_Deploy/index.js
+Restart=on-failure
+User=ubuntu
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
