@@ -20,13 +20,11 @@ jobs:
       - name: Install dependencies
         run: npm install --production
 
-      - name: Checkout and Terraform Init
-        uses: actions/checkout@v4
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init & Apply
+        id: tf
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -40,8 +38,8 @@ jobs:
         id: ec2
         run: |
           cd terraform
-          echo "ip=$(terraform output -raw instance_public_ip)" >> $GITHUB_OUTPUT
-
+          IP=$(terraform output -raw instance_public_ip)
+          echo "ip=$IP" >> $GITHUB_OUTPUT
 
       - name: Package app
         run: tar czf app.tar.gz index.js node_modules package.json Dockerfile
@@ -55,70 +53,40 @@ jobs:
         run: |
           scp -i key.pem -o StrictHostKeyChecking=no \
             app.tar.gz nodeapp.service \
-            ${{ secrets.SSH_USER }}@${{ secrets.HOST }}:/home/ubuntu/
+            ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }}:/home/ubuntu/
 
       - name: Deploy on EC2 & restart service
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }} << 'EOF'
-            # prepare deploy dir
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
-
-            # unpack code
             tar xzf /home/ubuntu/app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
-
-            # move service file into place
             sudo mv /home/ubuntu/nodeapp.service /etc/systemd/system/nodeapp.service
-
-            # reload & restart
             sudo systemctl daemon-reload
             sudo systemctl enable nodeapp.service
             sudo systemctl restart nodeapp.service
-
-            echo "😎" 
             touch /home/ubuntu/Cheeek.txt
           EOF
-
-
-
 
       - name: Deploy Docker container on EC2
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
-
-            # 0)Stop any systemd service to free port 4444
+            ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }} << 'EOF'
             sudo systemctl stop nodeapp.service || true
-
-            # 1) Ensure deploy dir
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
-
-            # 2) Unpack code & Dockerfile
             tar xzf /home/ubuntu/app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
             cd /home/ubuntu/devOpsNodeJS_Deploy
-
-            # 3) If Docker isn't installed, install & enable it
             if ! command -v docker > /dev/null; then
-              echo "Docker not found—installing..."
               sudo apt-get update
               sudo apt-get install -y docker.io
               sudo systemctl enable --now docker
               sudo usermod -aG docker ubuntu
             fi
-
-            # 4) Build the Docker image
             sudo docker build -t nodejs-sample .
-
-            # 5) Stop and remove existing container (if any)
             sudo docker stop nodeapp || true
-            sudo docker rm  nodeapp || true
-
-            # 6) Run the container on port 4444
+            sudo docker rm nodeapp || true
             sudo docker run -d --name nodeapp \
               -p 4444:4444 \
               --restart unless-stopped \
               nodejs-sample
           EOF
-
-
-            
