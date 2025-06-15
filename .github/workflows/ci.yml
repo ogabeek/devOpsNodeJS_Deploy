@@ -52,20 +52,21 @@ jobs:
 
             [Service]
             WorkingDirectory=/home/ubuntu/devOpsNodeJS_Deploy
-            ExecStart=/usr/bin/node index.js
+            ExecStart=/usr/bin/node /home/ubuntu/devOpsNodeJS_Deploy/index.js
             Restart=on-failure
             User=ubuntu
             Environment=NODE_ENV=production
 
             [Install]
             WantedBy=multi-user.target
-            SERVICE
+          EOF
 
+      - name: restart service
+        run: |
             sudo systemctl daemon-reload
             sudo systemctl enable nodeapp.service
             sudo systemctl restart nodeapp.service
-          EOF
-
+  
       - name: Test deployment
         run: |
             echo "😎" 
