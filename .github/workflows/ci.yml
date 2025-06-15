@@ -63,6 +63,10 @@ jobs:
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
+
+            # 0)Stop any systemd service to free port 4444
+            + sudo systemctl stop nodeapp.service || true
+
             # 1) Ensure deploy dir
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
 
