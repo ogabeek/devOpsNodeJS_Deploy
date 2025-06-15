@@ -1,26 +1,68 @@
-name: CI - Build and Test
+name: CD – Deploy to EC2
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+    branches: [ main ]
 
 jobs:
-  build-test:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --production
 
-      - name: Run unit tests
-        run: node --test
+      - name: Archive app for transfer
+        run: tar czf app.tar.gz index.js node_modules package.json
+
+      - name: Copy archive to EC2
+        env:
+          SSH_KEY: ${{ secrets.TARGET_SSH_KEY }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          HOST:    ${{ secrets.HOST }}
+        run: |
+          scp -i <(echo "$SSH_KEY") -o StrictHostKeyChecking=no app.tar.gz \
+            $SSH_USER@$HOST:/home/ubuntu/
+
+      - name: Deploy on EC2 and restart service
+        env:
+          SSH_KEY: ${{ secrets.TARGET_SSH_KEY }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          HOST:    ${{ secrets.HOST }}
+        run: |
+          ssh -i <(echo "$SSH_KEY") -o StrictHostKeyChecking=no \
+            $SSH_USER@$HOST << 'EOF'
+  # 1) unpack into your app directory
+  mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
+  tar xzf app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
+
+  # 2) overwrite (or create) the systemd service
+  cat << 'SERVICE' | sudo tee /etc/systemd/system/nodeapp.service
+[Unit]
+Description=Node.js Sample App
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/devOpsNodeJS_Deploy
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+User=ubuntu
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+  # 3) reload & restart
+  sudo systemctl daemon-reload
+  sudo systemctl enable nodeapp.service
+  sudo systemctl restart nodeapp.service
+EOF
