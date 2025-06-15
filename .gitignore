@@ -1,2 +1,7 @@
 node_modules
 devOpsClass.pem
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
