@@ -1,4 +1,5 @@
 variable "aws_region" {
-description = "AWS region to deploy into"
-type = string
-default = "eu-west-1"
+  description = "The AWS region to deploy to"
+  type        = string
+  default     = "us-east-1"
+}
