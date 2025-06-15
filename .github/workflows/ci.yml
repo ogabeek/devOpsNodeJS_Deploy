@@ -33,6 +33,8 @@ jobs:
           scp -i key.pem -o StrictHostKeyChecking=no \
             app.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.HOST }}:/home/ubuntu/
 
+
+
       - name: Deploy on EC2 & restart service
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no \
@@ -62,6 +64,10 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable nodeapp.service
             sudo systemctl restart nodeapp.service
+            
+      - name: Test deployment
+        run: |
             echo "😎" 
-            touch /home/ubuntu/devOpsNodeJS_Deploy/check.txt
+            touch /home/ubuntu/Cheeek.txt
+
             EOF
