@@ -68,6 +68,6 @@ jobs:
       - name: Test deployment
         run: |
             echo "😎" 
-            touch /home/ubuntu/Cheeek.txt
+            touch Cheeek.txt
 
             EOF
