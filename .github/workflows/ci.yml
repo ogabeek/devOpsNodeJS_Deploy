@@ -38,6 +38,7 @@ jobs:
           ssh -i key.pem -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
 
+            echo "👀"
 
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
             tar xzf /home/ubuntu/app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
@@ -61,4 +62,6 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable nodeapp.service
             sudo systemctl restart nodeapp.service
+            echo "😎" 
+            touch /home/ubuntu/devOpsNodeJS_Deploy/check.txt
             EOF
