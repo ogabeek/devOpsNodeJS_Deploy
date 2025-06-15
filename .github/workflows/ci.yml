@@ -28,14 +28,6 @@ jobs:
           echo "${{ secrets.TARGET_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-            - name: Package app
-        run: tar czf app.tar.gz index.js node_modules package.json
-
-      - name: Prepare SSH key
-        run: |
-          echo "${{ secrets.TARGET_SSH_KEY }}" > key.pem
-          chmod 600 key.pem
-
       - name: Copy app & service file to EC2
         run: |
           scp -i key.pem -o StrictHostKeyChecking=no \
