@@ -80,14 +80,14 @@ jobs:
             fi
 
             # 4) Build the Docker image
-            docker build -t nodejs-sample .
+            sudo docker build -t nodejs-sample .
 
             # 5) Stop and remove existing container (if any)
-            docker stop nodeapp || true
-            docker rm  nodeapp || true
+            sudo docker stop nodeapp || true
+            sudo docker rm  nodeapp || true
 
             # 6) Run the container on port 4444
-            docker run -d --name nodeapp \
+            sudo docker run -d --name nodeapp \
               -p 4444:4444 \
               --restart unless-stopped \
               nodejs-sample
