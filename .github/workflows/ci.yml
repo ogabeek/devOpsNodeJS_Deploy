@@ -37,9 +37,10 @@ jobs:
       - name: Get EC2 IP
         id: ec2
         run: |
-          cd terraform
+          # this prints exactly the IP with no quotes or extra text
           IP=$(terraform output -raw instance_public_ip)
-          echo "ip=$IP" >> $GITHUB_OUTPUT
+          # write exactly one valid line into $GITHUB_OUTPUT
+          echo "instance_public_ip=$IP" >> $GITHUB_OUTPUT
 
       - name: Package app
         run: tar czf app.tar.gz index.js node_modules package.json Dockerfile
