@@ -36,10 +36,19 @@ jobs:
 
       - name: Get EC2 IP
         id: ec2
+        working-directory: terraform 
+
         run: |
-          # this prints exactly the IP with no quotes or extra text
+          # grab only the raw IP
           IP=$(terraform output -raw instance_public_ip)
-          # write exactly one valid line into $GITHUB_OUTPUT
+
+          # sanity check: exit early if empty
+          if [ -z "$IP" ]; then
+            echo "❌ instance_public_ip is empty! Did terraform output fail?" >&2
+            exit 1
+          fi
+
+          # write exactly one valid line into GITHUB_OUTPUT
           echo "instance_public_ip=$IP" >> $GITHUB_OUTPUT
 
       - name: Package app
