@@ -24,7 +24,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init & Apply
-        id: tf
+        id: tf_apply
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -36,20 +36,21 @@ jobs:
 
       - name: Get EC2 IP
         id: ec2
-        working-directory: terraform 
-
         run: |
-          # grab only the raw IP
-          IP=$(terraform output -raw instance_public_ip)
+          cd terraform
 
-          # sanity check: exit early if empty
+          # 1) clear any previous outputs so only our line remains
+          > $GITHUB_OUTPUT
+
+          # 2) grab just the raw IP (no quotes, no extra text)
+          IP=$(terraform output -raw instance_public_ip)
           if [ -z "$IP" ]; then
-            echo "❌ instance_public_ip is empty! Did terraform output fail?" >&2
+            echo "❌ instance_public_ip is empty!" >&2
             exit 1
           fi
 
-          # write exactly one valid line into GITHUB_OUTPUT
-          echo "instance_public_ip=$IP" >> $GITHUB_OUTPUT
+          # 3) write exactly one valid name=value line
+          echo "ip=$IP" >> $GITHUB_OUTPUT
 
       - name: Package app
         run: tar czf app.tar.gz index.js node_modules package.json Dockerfile
