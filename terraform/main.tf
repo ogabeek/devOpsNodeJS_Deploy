@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 resource "aws_key_pair" "deployer" {
-  key_name   = "devOpsClass7"
+  key_name   = "devOpsClass8"
   public_key = file("${path.module}/devOpsClass.pub")
 }
 
