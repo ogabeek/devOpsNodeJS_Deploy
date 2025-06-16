@@ -2,10 +2,10 @@ provider "aws" {
   region = var.aws_region
 }
 
-//resource "aws_key_pair" "deployer" {
-//  key_name   = "devOpsClass5"
-//  public_key = file("${path.module}/devOpsClass.pub")
-//}
+resource "aws_key_pair" "deployer" {
+  key_name   = "devOpsClass7"
+  public_key = file("${path.module}/devOpsClass.pub")
+}
 
 resource "aws_security_group" "node_sg" {
   name_prefix = "node-app-sg-"
@@ -46,15 +46,10 @@ data "aws_ami" "ubuntu" {
   } 
 }
 
-variable "aws_key_name" {
-  type    = string
-  default = "devOpsClass5"
-}
-
 resource "aws_instance" "node" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
-  key_name               = var.aws_key_name
+  key_name               = aws_key_pair.deployer.key_name
   vpc_security_group_ids = [aws_security_group.node_sg.id]
   tags = {
     Name = "node-app-instance"
