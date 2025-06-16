@@ -9,12 +9,42 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # change this to match your TF resource’s key_name
       KEY_NAME: devOpsClass5
+      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Set up AWS CLI
+        run: |
+          pip install awscli
+
+      - name: Prepare SSH keys
+        run: |
+          # private for SSH
+          echo "${{ secrets.TARGET_SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+          # public for import-key-pair
+          echo "${{ secrets.TARGET_SSH_PUBLIC_KEY }}" > key.pub
+
+      - name: Ensure EC2 Key Pair Exists
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION:            ${{ env.AWS_REGION }}
+        run: |
+          if aws ec2 describe-key-pairs \
+               --key-names "$KEY_NAME" \
+               --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "🔑 key $KEY_NAME already exists — skipping import."
+          else
+            echo "🆕 importing key $KEY_NAME"
+            aws ec2 import-key-pair \
+              --key-name "$KEY_NAME" \
+              --public-key-material fileb://key.pub \
+              --region "$AWS_REGION"
+          fi
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -27,34 +57,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
 
-      # ──────────────────────────────────────────────────────────────────────
-      # NEW: Import existing key pair if it’s already in AWS
-      - name: Import SSH key pair if present
-        env:
-          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION:            ${{ secrets.AWS_REGION }}
-          KEY_NAME:              ${{ env.KEY_NAME }}
-        run: |
-          # If AWS already has this key, import into TF state (ignore errors)
-          if aws ec2 describe-key-pairs \
-               --key-names "$KEY_NAME" \
-               --region "$AWS_REGION" >/dev/null 2>&1; then
-            echo "🔑 Key $KEY_NAME exists; importing into Terraform state…"
-            cd terraform
-            terraform init    # ensure state is initialized
-            terraform import aws_key_pair.deployer "$KEY_NAME" || true
-          else
-            echo "🆕 Key $KEY_NAME not found; Terraform will create it."
-          fi
-
-      # ──────────────────────────────────────────────────────────────────────
       - name: Terraform Init & Apply
         id: tf_apply
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION:            ${{ secrets.AWS_REGION }}
+          AWS_REGION:            ${{ env.AWS_REGION }}
         run: |
           cd terraform
           terraform init
@@ -66,10 +74,6 @@ jobs:
           cd terraform
           > $GITHUB_OUTPUT
           IP=$(terraform output -raw instance_public_ip)
-          if [ -z "$IP" ]; then
-            echo "❌ instance_public_ip is empty!" >&2
-            exit 1
-          fi
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
       - name: Package app
