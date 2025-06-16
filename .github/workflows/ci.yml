@@ -72,6 +72,8 @@ jobs:
           fi
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
+           # ── after Terraform Apply ──
+
       - name: Package app
         run: tar czf app.tar.gz index.js node_modules package.json Dockerfile
 
@@ -82,14 +84,17 @@ jobs:
 
       - name: Copy app & service file to EC2
         run: |
+          # grab the IP right here—no GITHUB_OUTPUT needed
+          IP=$(terraform -chdir=terraform output -raw instance_public_ip)
           scp -i key.pem -o StrictHostKeyChecking=no \
             app.tar.gz nodeapp.service \
-            ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }}:/home/ubuntu/
+            ${{ secrets.SSH_USER }}@$IP:/home/ubuntu/
 
       - name: Deploy on EC2 & restart service
         run: |
+          IP=$(terraform -chdir=terraform output -raw instance_public_ip)
           ssh -i key.pem -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }} << 'EOF'
+            ${{ secrets.SSH_USER }}@$IP << 'EOF'
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
             tar xzf /home/ubuntu/app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
             sudo mv /home/ubuntu/nodeapp.service /etc/systemd/system/nodeapp.service
@@ -101,8 +106,9 @@ jobs:
 
       - name: Deploy Docker container on EC2
         run: |
+          IP=$(terraform -chdir=terraform output -raw instance_public_ip)
           ssh -i key.pem -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ steps.ec2.outputs.ip }} << 'EOF'
+            ${{ secrets.SSH_USER }}@$IP << 'EOF'
             sudo systemctl stop nodeapp.service || true
             mkdir -p /home/ubuntu/devOpsNodeJS_Deploy
             tar xzf /home/ubuntu/app.tar.gz -C /home/ubuntu/devOpsNodeJS_Deploy
