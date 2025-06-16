@@ -8,6 +8,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      # change this to match your TF resource’s key_name
+      KEY_NAME: devOpsClass5
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -23,6 +27,28 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
 
+      # ──────────────────────────────────────────────────────────────────────
+      # NEW: Import existing key pair if it’s already in AWS
+      - name: Import SSH key pair if present
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION:            ${{ secrets.AWS_REGION }}
+          KEY_NAME:              ${{ env.KEY_NAME }}
+        run: |
+          # If AWS already has this key, import into TF state (ignore errors)
+          if aws ec2 describe-key-pairs \
+               --key-names "$KEY_NAME" \
+               --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "🔑 Key $KEY_NAME exists; importing into Terraform state…"
+            cd terraform
+            terraform init    # ensure state is initialized
+            terraform import aws_key_pair.deployer "$KEY_NAME" || true
+          else
+            echo "🆕 Key $KEY_NAME not found; Terraform will create it."
+          fi
+
+      # ──────────────────────────────────────────────────────────────────────
       - name: Terraform Init & Apply
         id: tf_apply
         env:
@@ -38,18 +64,12 @@ jobs:
         id: ec2
         run: |
           cd terraform
-
-          # 1) clear any previous outputs so only our line remains
           > $GITHUB_OUTPUT
-
-          # 2) grab just the raw IP (no quotes, no extra text)
           IP=$(terraform output -raw instance_public_ip)
           if [ -z "$IP" ]; then
             echo "❌ instance_public_ip is empty!" >&2
             exit 1
           fi
-
-          # 3) write exactly one valid name=value line
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
       - name: Package app
